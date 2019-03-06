@@ -44,10 +44,16 @@ def listen():
     time, status_dict = get_gw_status()
     print(format_status(time, status_dict))
     while True:
+        # Sleep first, so we don't bombard the site
+        sleep(30)
+
+        # Compare to see if anything has changed
         old_status_dict = status_dict.copy()
         time, status_dict = get_gw_status()
         changed = [detector for detector in status_dict
                    if status_dict[detector] != old_status_dict[detector]]
+
+        # If so, then print out
         if changed:
             for detector in changed:
                 print('{} status has changed: "{}" -> "{}"'.format(detector,
@@ -55,7 +61,6 @@ def listen():
                                                                    status_dict[detector],
                                                                    ))
             print(format_status(time, status_dict))
-        sleep(30)
 
 
 if __name__ == '__main__':
