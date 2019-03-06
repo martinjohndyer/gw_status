@@ -35,11 +35,14 @@ def get_gw_status():
 
 
 def format_status(status_dict):
+    """Format the status dict."""
     now = Time.now()
     string = 'Status at {}:\n'.format(now.iso)
     for detector in sorted(status_dict):
-        string += '\t{}: "{}"\n'.format(detector, status_dict[detector])
+        string += '\t{: <{i}}: "{}"\n'.format(detector, status_dict[detector],
+                                              i=max([len(d) for d in status_dict]) + 1)
     return string
+
 
 def listen():
     """Listen to the status page and pick up any changes."""
