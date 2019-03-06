@@ -1,6 +1,6 @@
 """A little script to monitor the GW detector statuses."""
 
-from time import time, sleep
+from time import sleep
 from urllib.request import urlopen
 
 import bs4
@@ -52,4 +52,7 @@ def listen():
                    if status_dict[detector] != old_status_dict[detector]]
         if changed:
             print(format_status(status_dict))
-        time.sleep(30)
+        sleep(30)
+
+if __name__ == '__main__':
+    listen()
