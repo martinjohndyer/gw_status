@@ -48,9 +48,15 @@ def listen():
         # Sleep first, so we don't bombard the site
         sleep(120)
 
-        # Compare to see if anything has changed
+        # Store old dict, and fetch new one
         old_status_dict = status_dict.copy()
-        time, status_dict = get_gw_status()
+        time, new_status_dict = get_gw_status()
+
+        # We're only interested in the status if it's not an error
+        status_dict = {detector: status_dict[detector] for detector in status_dict
+                       if 'error' not in status_dict[detector].lower()}
+
+        # See if any changed
         changed = [detector for detector in status_dict
                    if status_dict[detector] != old_status_dict[detector]]
 
