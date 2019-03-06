@@ -1,11 +1,15 @@
 """A little script to monitor the GW detector statuses."""
 
+import argparse
 import json
+import os
 from datetime import datetime
 from time import sleep
 from urllib.request import urlopen
 
 from astropy.time import Time
+
+from slackclient import SlackClient
 
 STATUS_PAGE = 'https://ldas-jobs.ligo.caltech.edu/~gwistat/gwistat/gwistat.json'
 
@@ -37,10 +41,28 @@ def format_status(data):
     return string
 
 
-def listen():
+def send_slack_message(data, channel, token):
+    """Send a status report to Slack."""
+    client = SlackClient(token)
+
+    msg = 'GW detector status update:'
+    attachments = []
+    for detector in data['detectors']:
+        attachment = {'title': detector['site'],
+                      'text': detector['status'],
+                      'fallback': '{}: {}'.format(detector['site'], detector['status']),
+                      'color': detector['color'],
+                      }
+        attachments.append(attachment)
+
+    client.api_call('chat.postMessage', text=msg, attachments=attachments, channel=channel)
+
+
+def listen(channel, token):
     """Listen to the status page and pick up any changes."""
     data = get_gw_status()
     print(format_status(data))
+    send_slack_message(data, channel, token)
     status_dict = {detector['site']: detector['status'] for detector in data['detectors']}
 
     while True:
@@ -67,7 +89,14 @@ def listen():
                                                                    status_dict[detector],
                                                                    ))
             print(format_status(data))
+            send_slack_message(data, channel, token)
 
 
 if __name__ == '__main__':
-    listen()
+    parser = argparse.ArgumentParser(description=__doc__,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument('-c', '--channel', help='Slack channel name')
+    parser.add_argument('-t', '--token', help='Slack Bot Token')
+    args = parser.parse_args()
+
+    listen(args.channel, args.token)
