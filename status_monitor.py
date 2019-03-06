@@ -55,6 +55,11 @@ def listen():
         changed = [detector for detector in status_dict
                    if status_dict[detector] != old_status_dict[detector]]
         if changed:
+            for detector in changed:
+                print('{} status has changed: "{}" -> "{}"'.format(detector,
+                                                                   old_status_dict[detector],
+                                                                   status_dict[detector],
+                                                                   ))
             print(format_status(status_dict))
         sleep(30)
 
