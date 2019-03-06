@@ -13,6 +13,8 @@ from slackclient import SlackClient
 
 STATUS_PAGE = 'https://ldas-jobs.ligo.caltech.edu/~gwistat/gwistat/gwistat.json'
 
+DETECTORS = ['LIGO Hanford', 'LIGO Livingston', 'Virgo']
+
 
 def get_gw_status():
     """Fetch and parse the GW status page."""
@@ -36,6 +38,8 @@ def format_status(data):
     string = 'Status at {}:\n'.format(data['timestamp'].iso[:-7])
     max_len = max([len(d['site']) for d in data['detectors']]) + 1
     for detector in data['detectors']:
+        if detector['site'] not in DETECTORS:
+            continue
         string += '\t{: <{i}}: "{}"\n'.format(detector['site'], detector['status'],
                                               i=max_len)
     return string
@@ -48,6 +52,8 @@ def send_slack_message(data, channel, token):
     msg = 'GW detector status update:'
     attachments = []
     for detector in data['detectors']:
+        if detector['site'] not in DETECTORS:
+            continue
         attachment = {'title': detector['site'],
                       'text': detector['status'],
                       'fallback': '{}: {}'.format(detector['site'], detector['status']),
