@@ -43,9 +43,10 @@ def listen():
     """Listen to the status page and pick up any changes."""
     time, status_dict = get_gw_status()
     print(format_status(time, status_dict))
+
     while True:
         # Sleep first, so we don't bombard the site
-        sleep(30)
+        sleep(120)
 
         # Compare to see if anything has changed
         old_status_dict = status_dict.copy()
