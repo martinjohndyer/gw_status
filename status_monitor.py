@@ -29,7 +29,7 @@ def get_gw_status():
 
 def format_status(data):
     """Format the status dict."""
-    string = 'Status at {}:\n'.format(data['timestamp'].iso)
+    string = 'Status at {}:\n'.format(data['timestamp'].iso[:-7])
     max_len = max([len(d['site']) for d in data['detectors']]) + 1
     for detector in data['detectors']:
         string += '\t{: <{i}}: "{}"\n'.format(detector['site'], detector['status'],
