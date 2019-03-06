@@ -2,10 +2,9 @@
 
 import argparse
 import json
-import os
+import urllib
 from datetime import datetime
 from time import sleep
-from urllib.request import urlopen
 
 from astropy.time import Time
 
@@ -18,10 +17,18 @@ DETECTORS = ['LIGO Hanford', 'LIGO Livingston', 'Virgo']
 
 def get_gw_status():
     """Fetch and parse the GW status page."""
-    # Fetch the JSON
-    request = urlopen(STATUS_PAGE)
-    contents = request.read()
-    data = json.loads(contents.decode())
+    data = None
+    while not data:
+        try:
+            # Fetch the JSON
+            request = urllib.request.urlopen(STATUS_PAGE)
+            contents = request.read()
+            data = json.loads(contents.decode())
+        except urllib.error.HTTPError:
+            print('Got 403, retrying...')
+            sleep(10)
+        except Exception:
+            raise
 
     # Need to parse the timestamp, doesn't include the year!
     current_year = datetime.now().year
