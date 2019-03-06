@@ -87,20 +87,26 @@ def listen(channel, token):
         data = get_gw_status()
 
         # We're only interested in the status if it's not an error
-        status_dict = {detector['site']: detector['status'] for detector in data['detectors']
-                       if 'error' not in detector['status'].lower()}
+        status_dict = {detector['site']: detector['status'] for detector in data['detectors']}
 
         # See if any changed
         changed = [detector for detector in status_dict
                    if status_dict[detector] != old_status_dict[detector]]
 
-        # If so, then print out
-        if changed:
-            for detector in changed:
-                print('{} status has changed: "{}" -> "{}"'.format(detector,
-                                                                   old_status_dict[detector],
-                                                                   status_dict[detector],
-                                                                   ))
+        # Processes changes
+        for detector in changed:
+            # Ignore unfiltered
+            if detector['site'] not in DETECTORS:
+                continue
+
+            # Ignore errors
+            if 'error' in status_dict[detector] or 'error' in old_status_dict[detector]:
+                continue
+
+            print('{} status has changed: "{}" -> "{}"'.format(detector,
+                                                               old_status_dict[detector],
+                                                               status_dict[detector],
+                                                               ))
             print(format_status(data))
             send_slack_message(data, channel, token)
 
