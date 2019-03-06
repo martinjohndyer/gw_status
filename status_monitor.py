@@ -3,8 +3,9 @@
 from time import sleep
 from urllib.request import urlopen
 
-import bs4
 from astropy.time import Time
+
+import bs4
 
 
 STATUS_PAGE = 'https://ldas-jobs.ligo.caltech.edu/~gwistat/gwistat/gwistat.html'
@@ -56,6 +57,7 @@ def listen():
         if changed:
             print(format_status(status_dict))
         sleep(30)
+
 
 if __name__ == '__main__':
     listen()
