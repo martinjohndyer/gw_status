@@ -37,6 +37,9 @@ def get_gw_status():
     timestamp = Time(timestamp)  # Newer astropys gives Time.strptime
     data['timestamp'] = timestamp
 
+    # Filter to only the ones we care about
+    data['detectors'] = [d for d in data['detectors'] if d['site'] in DETECTORS]
+
     return data
 
 
@@ -45,8 +48,6 @@ def format_status(data):
     string = 'Status at {}:\n'.format(data['timestamp'].iso[:-7])
     max_len = max([len(d['site']) for d in data['detectors']]) + 1
     for detector in data['detectors']:
-        if detector['site'] not in DETECTORS:
-            continue
         string += '\t{: <{i}}: "{}"\n'.format(detector['site'], detector['status'],
                                               i=max_len)
     return string
@@ -59,8 +60,6 @@ def send_slack_message(data, channel, token):
     msg = 'GW detector status update:'
     attachments = []
     for detector in data['detectors']:
-        if detector['site'] not in DETECTORS:
-            continue
         attachment = {'title': detector['site'],
                       'text': detector['status'],
                       'fallback': '{}: {}'.format(detector['site'], detector['status']),
@@ -95,10 +94,6 @@ def listen(channel, token):
 
         # Processes changes
         for detector in changed:
-            # Ignore unfiltered
-            if detector['site'] not in DETECTORS:
-                continue
-
             # Ignore errors
             if 'error' in status_dict[detector] or 'error' in old_status_dict[detector]:
                 continue
