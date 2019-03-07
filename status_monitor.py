@@ -10,7 +10,8 @@ from astropy.time import Time
 
 from slackclient import SlackClient
 
-STATUS_PAGE = 'https://ldas-jobs.ligo.caltech.edu/~gwistat/gwistat/gwistat.json'
+STATUS_PAGE = 'https://ldas-jobs.ligo.caltech.edu/~gwistat/gwistat/gwistat.html'
+STATUS_JSON = 'https://ldas-jobs.ligo.caltech.edu/~gwistat/gwistat/gwistat.json'
 
 DETECTORS = ['LIGO Hanford', 'LIGO Livingston', 'Virgo']
 
@@ -21,7 +22,7 @@ def get_gw_status():
     while not data:
         try:
             # Fetch the JSON
-            request = urllib.request.urlopen(STATUS_PAGE)
+            request = urllib.request.urlopen(STATUS_JSON)
             contents = request.read()
             data = json.loads(contents.decode())
         except urllib.error.HTTPError:
@@ -57,7 +58,7 @@ def send_slack_message(data, channel, token):
     """Send a status report to Slack."""
     client = SlackClient(token)
 
-    msg = 'GW detector status update:'
+    msg = '<{}|GW detector status update>:'.format(STATUS_PAGE)
     attachments = []
     for detector in data['detectors']:
         attachment = {'title': detector['site'],
