@@ -14,9 +14,13 @@ STATUS_PAGE = 'https://ldas-jobs.ligo.caltech.edu/~gwistat/gwistat/gwistat.html'
 STATUS_JSON = 'https://ldas-jobs.ligo.caltech.edu/~gwistat/gwistat/gwistat.json'
 
 DETECTORS = ['LIGO Hanford', 'LIGO Livingston', 'Virgo']
+MAX_LEN = max([len(name) for name in DETECTORS])
+
+OBSERVING_DICT = {detector: False for detector in DETECTORS}
+OBSERVING_STATUSES = ['Observing', 'Science']
 
 
-def get_gw_status():
+def get_gw_data():
     """Fetch and parse the GW status page."""
     data = None
     while not data:
@@ -31,80 +35,117 @@ def get_gw_status():
         except Exception:
             raise
 
-    # Need to parse the timestamp, doesn't include the year!
+    # Create a simple nested dict for each detector, with the site as the key
+    # Only for the sites we care about (in DETECTORS)
+    status_dict = {detector_dict['site']: detector_dict
+                   for detector_dict in data['detectors']
+                   if detector_dict['site'] in DETECTORS}
+
+    # Add a boolean observing and error flags
+    for detector in status_dict:
+        status_dict[detector]['observing'] = status_dict[detector]['status'] in OBSERVING_STATUSES
+        status_dict[detector]['error'] = 'error' in status_dict[detector]['status']
+
+    # Need to parse the timestamp, it doesn't include the year!
     current_year = datetime.now().year
     timestamp = str(current_year) + data['UTC']
     timestamp = datetime.strptime(timestamp, '%Y%b %d, %H:%M UTC')
     timestamp = Time(timestamp)  # Newer astropys gives Time.strptime
-    data['timestamp'] = timestamp
 
-    # Filter to only the ones we care about
-    data['detectors'] = [d for d in data['detectors'] if d['site'] in DETECTORS]
-
-    return data
-
-
-def format_status(data):
-    """Format the status dict."""
-    string = 'Status at {}:\n'.format(data['timestamp'].iso[:-7])
-    max_len = max([len(d['site']) for d in data['detectors']]) + 1
-    for detector in data['detectors']:
-        string += '\t{: <{i}}: "{}"\n'.format(detector['site'], detector['status'],
-                                              i=max_len)
-    return string
-
-
-def send_slack_message(data, channel, token):
-    """Send a status report to Slack."""
-    client = SlackClient(token)
-
-    msg = '<{}|GW detector status update>:'.format(STATUS_PAGE)
-    attachments = []
-    for detector in data['detectors']:
-        attachment = {'title': detector['site'],
-                      'text': detector['status'],
-                      'fallback': '{}: {}'.format(detector['site'], detector['status']),
-                      'color': detector['color'],
-                      }
-        attachments.append(attachment)
-
-    client.api_call('chat.postMessage', text=msg, attachments=attachments, channel=channel)
+    return status_dict, timestamp
 
 
 def listen(channel, token):
     """Listen to the status page and pick up any changes."""
-    data = get_gw_status()
-    print(format_status(data))
-    send_slack_message(data, channel, token)
-    status_dict = {detector['site']: detector['status'] for detector in data['detectors']}
+    # Blank observing dict to start
+    observing_dict = {detector: None for detector in DETECTORS}
 
     while True:
-        # Sleep first, so we don't bombard the site
+        # Store old dict
+        old_observing_dict = observing_dict.copy()
+
+        # Get the current detector data from the site
+        status_dict, timestamp = get_gw_data()
+
+        # Build the new observing dict
+        # Note we don't change if the error flag is true
+        observing_dict = {detector:
+                          status_dict[detector]['observing']
+                          if not status_dict[detector]['error']
+                          else old_observing_dict[detector]
+                          for detector in status_dict}
+
+        # Count the number observing
+        num_observing = sum([observing_dict[detector] for detector in observing_dict])
+
+        # See if any changed observing status
+        changed = [detector for detector in observing_dict
+                   if (observing_dict[detector] != old_observing_dict[detector] and
+                       'error' not in status_dict[detector]['status'])]
+
+        # If the status chenged then alert people!
+        if any(changed):
+            print('~~~~~~~~~~~~~~~~~~~~~~~~~~~')
+
+            # Print the number of detectors observing
+            string = 'Status at {}:\n  {}/{} detectors are observing'
+            print(string.format(timestamp.iso[:-7],
+                                num_observing,
+                                len(observing_dict)))
+
+            # Print all detector statuses
+            for detector in sorted(status_dict):
+                string = '  {: <{i}}: {} ("{}")'
+                print(string.format(detector,
+                                    '1' if status_dict[detector]['observing'] else '0',
+                                    status_dict[detector]['status'],
+                                    i=MAX_LEN + 1))
+
+            # Send the Slack message
+            if channel and token:
+                # Create Slack client
+                client = SlackClient(token)
+
+                # Create blank message with link to page
+                string = '<{}|GW detector status update>: {}/{} observing'
+                msg = string.format(STATUS_PAGE,
+                                    num_observing,
+                                    len(observing_dict))
+
+                # Create attachment for each detector
+                attachments = []
+                for detector in sorted(status_dict):
+                    # Mark which detector is updated
+                    title = detector
+                    if detector in changed:
+                        title += ' *UPDATED*'
+
+                    # Format each detector status
+                    if status_dict[detector]['observing']:
+                        text = 'Observing'
+                        color = '#00ff00'
+                    elif status_dict[detector]['status'] == 'Down':
+                        text = 'Down'
+                        color = '#ff4040'
+                    else:
+                        text = 'Down ({})'.format(status_dict[detector]['status'])
+                        color = '#ff4040'
+
+                    attachment = {'title': title,
+                                  'text': text,
+                                  'fallback': '{}: {}'.format(title, text),
+                                  'color': color,
+                                  }
+                    attachments.append(attachment)
+
+                # Send the message
+                client.api_call('chat.postMessage',
+                                text=msg,
+                                attachments=attachments,
+                                channel=channel)
+
+        # Sleep so we don't bombard the site
         sleep(120)
-
-        # Store old dict, and fetch new one
-        old_status_dict = status_dict.copy()
-        data = get_gw_status()
-
-        # We're only interested in the status if it's not an error
-        status_dict = {detector['site']: detector['status'] for detector in data['detectors']}
-
-        # See if any changed
-        changed = [detector for detector in status_dict
-                   if status_dict[detector] != old_status_dict[detector]]
-
-        # Processes changes
-        for detector in changed:
-            # Ignore errors
-            if 'error' in status_dict[detector] or 'error' in old_status_dict[detector]:
-                continue
-
-            print('{} status has changed: "{}" -> "{}"'.format(detector,
-                                                               old_status_dict[detector],
-                                                               status_dict[detector],
-                                                               ))
-            print(format_status(data))
-            send_slack_message(data, channel, token)
 
 
 if __name__ == '__main__':
