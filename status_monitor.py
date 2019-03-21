@@ -106,34 +106,36 @@ def listen(channel, token):
                 # Create Slack client
                 client = SlackClient(token)
 
-                # Create blank message with link to page
+                # Create message with link to page
                 string = '<{}|GW detector status update>: {}/{} observing'
                 msg = string.format(STATUS_PAGE,
                                     num_observing,
                                     len(observing_dict))
 
+                # Report which detectors changed
+                for detector in sorted(changed):
+                    if old_observing_dict[detector] is None:
+                        # First time
+                        pass
+                    elif observing_dict[detector]:
+                        msg += '\n({} changed to Observing)'.format(detector)
+                    else:
+                        msg += '\n({} changed to Down)'.format(detector)
+
                 # Create attachment for each detector
                 attachments = []
                 for detector in sorted(status_dict):
-                    # Mark which detector is updated
-                    title = detector
-                    if detector in changed:
-                        title += ' *UPDATED*'
-
                     # Format each detector status
                     if status_dict[detector]['observing']:
                         text = 'Observing'
                         color = '#00ff00'
-                    elif status_dict[detector]['status'] == 'Down':
+                    else:
                         text = 'Down'
                         color = '#ff4040'
-                    else:
-                        text = 'Down ({})'.format(status_dict[detector]['status'])
-                        color = '#ff4040'
 
-                    attachment = {'title': title,
+                    attachment = {'title': detector,
                                   'text': text,
-                                  'fallback': '{}: {}'.format(title, text),
+                                  'fallback': '{}: {}'.format(detector, text),
                                   'color': color,
                                   }
                     attachments.append(attachment)
