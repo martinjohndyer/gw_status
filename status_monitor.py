@@ -29,8 +29,8 @@ def get_gw_data():
             request = urllib.request.urlopen(STATUS_JSON)
             contents = request.read()
             data = json.loads(contents.decode())
-        except urllib.error.HTTPError:
-            print('Got 403, retrying...')
+        except urllib.error.URLError as err:
+            print('Got error (URL {}), retrying...'.format(err.reason))
             sleep(10)
         except Exception:
             raise
